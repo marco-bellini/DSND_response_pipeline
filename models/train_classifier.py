@@ -76,18 +76,18 @@ def save_model(model, model_filepath):
     pass
 
 
-def mo_confusion_matrix(y_true, y_pred):
+def mo_confusion_matrix(y_test, y_pred):
     """
 
-    :param y_true:
+    :param y_test:
     :param y_pred:
     :return:
 
     """
-    cm = np.zeros((2, 2, y_true.shape[1])).astype(int)
+    cm = np.zeros((2, 2, y_test.shape[1])).astype(int)
 
     c = 0
-    for column in y_true.columns:
+    for column in y_test.columns:
         cm[:, :, c] = met.confusion_matrix(y_test[column], y_pred[:, c])
         c += 1
     tn = cm[0, 0, :].ravel()
@@ -97,12 +97,12 @@ def mo_confusion_matrix(y_true, y_pred):
 
     return (tn, fp, fn, tp)
 
-def mo_weighted_scorer(y_true, y_pred, weights={'tp': 1, 'tn': 1, 'fn': 1, 'fp': 1}, class_weights=None,
+def mo_weighted_scorer(y_test, y_pred, weights={'tp': 1, 'tn': 1, 'fn': 1, 'fp': 1}, class_weights=None,
                        adjust_for_frequency=False,
-                       return_sum=True):
+                       return_single=True):
     """
 
-    :param y_true:
+    :param y_test:
     :param y_pred:
     :param weights:
     :param class_weights:
@@ -137,8 +137,9 @@ def mo_weighted_scorer(y_true, y_pred, weights={'tp': 1, 'tn': 1, 'fn': 1, 'fp':
         # adjust score by weights
         score *= class_weights
 
-    if return_sum:
-        return np.sum(score)
+    if return_single:
+        #return np.sum(np.power(score.values,2.)))
+        return np.sum(score.values)
     else:
         return score
 
@@ -209,30 +210,50 @@ def main():
     print('X:', X.shape)
 
     X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
-
-    classifier='DT'
-    print(classifier)
-
     pipelines=create_pipelines()
-    model = pipelines[classifier][0]
-    parameters = pipelines[classifier][1]
 
-    cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=3)
-    cv.fit(X_train, y_train)
+    weights={'tp':2,'tn':.001,'fn':1,'fp':.1}
+    class_weights=y_test.iloc[0,:]*0.0+1
+    class_weights['child_alone']=0 # no support data
+    class_weights['death']=5
+    class_weights['floods']=2
+    class_weights['fire']=4
+    class_weights['storm']=2
+    class_weights['earthquake']=5
+    class_weights['search_and_rescue']=3
 
-    #print(cv)
 
-    print()
-    print('training finished')
-    print()
+    scorer = make_scorer(mo_weighted_scorer,greater_is_better = True ,weights=weights,
+                         class_weights=class_weights,adjust_for_frequency=True,
+                         return_single=True)
 
-    filename='^%2d_%s' % (1,classifier)
-    pickle.dump(cv.best_estimator_, open(filename + '_model.pkl', 'wb'))
-    pickle.dump(cv.best_params_, open(filename + '_params.pkl', 'wb'))
-    pickle.dump(y_train, open(filename + '_ytrain.pkl', 'wb'))
+    for classifier in pipelines.keys():
+        print(classifier)
 
-    y_pred = cv.best_estimator_.predict(X_test)
-    pickle.dump(y_pred, open(filename + '_ypred.pkl', 'wb'))
+        model = pipelines[classifier][0]
+        parameters = pipelines[classifier][1]
+        cv_folds=5
+
+
+        #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
+        cv = GridSearchCV(model, scoring=scorer, param_grid=parameters, verbose=2, cv=cv_folds)
+        cv.fit(X_train, y_train)
+
+        #print(cv)
+
+        print()
+        print('training finished')
+        print()
+
+        filename='%s_%s' % ('04_0.2_w',classifier)
+        pickle.dump(cv.best_estimator_, open(filename + '_model.pkl', 'wb'))
+        pickle.dump(cv.best_params_, open(filename + '_params.pkl', 'wb'))
+        pickle.dump(y_test, open(filename + '_ytest.pkl', 'wb'))
+        
+        y_pred = cv.best_estimator_.predict(X_test)
+        pickle.dump(y_pred, open(filename + '_ypred.pkl', 'wb'))
+
+
 
 if __name__ == '__main__':
     main()
