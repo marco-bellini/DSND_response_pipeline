@@ -39,6 +39,8 @@ def load_data(database_filepath):
     """
 
     # database_filepath='sqlite:///data//InsertDatabaseName.db'
+
+
     engine = create_engine(database_filepath)
     df = pd.read_sql_table('InsertTableName', engine)
     X = df['message']
@@ -69,14 +71,28 @@ def build_model():
 
 
 def evaluate_model(model, X_test, Y_test, category_names):
-    pass
+    """
+
+    :param model:
+    :param X_test:
+    :param Y_test:
+    :param category_names:
+    :return:
+    """
+
+    y_pred = model.predict(X_test)
+    classification_report = pd.DataFrame(
+        classification_report(Y_test.values, y_pred, target_names=category_names,
+                              output_dict=True)).T
+
+    print(classification_report)
 
 
 def save_model(model, model_filepath):
     pass
 
 
-def mo_confusion_matrix(y_test, y_pred):
+def mo_confusion_matrix(y_test, y_pred,as_DataFrame=False):
     """
 
     :param y_test:
@@ -95,7 +111,15 @@ def mo_confusion_matrix(y_test, y_pred):
     fn = cm[1, 0, :].ravel()
     tp = cm[1, 1, :].ravel()
 
-    return (tn, fp, fn, tp)
+    if as_DataFrame:
+        return( pd.DataFrame( np.vstack((tn, fp, fn, tp)).T,columns=['tn', 'fp', 'fn', 'tp'],index=y_test.columns ) )
+    else:
+        return (tn, fp, fn, tp)
+
+
+
+
+
 
 def mo_weighted_scorer(y_test, y_pred, weights={'tp': 1, 'tn': 1, 'fn': 1, 'fp': 1}, class_weights=None,
                        adjust_for_frequency=False,
