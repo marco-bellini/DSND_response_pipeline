@@ -203,8 +203,9 @@ def create_pipelines():
 
 def main():
 
-    database_filepath = 'sqlite:///data//InsertDatabaseName.db'
+    database_filepath = 'sqlite:///'+'..//data//InsertDatabaseName.db'
     X, Y, category_names = load_data(database_filepath)
+    print('database loaded')
     print('X:', X.shape)
 
     X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
@@ -217,6 +218,13 @@ def main():
     parameters = pipelines[classifier][1]
 
     cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=3)
+    cv.fit(X_train, y_train)
+
+    #print(cv)
+
+    print()
+    print('training finished')
+    print()
 
     filename='^%2d_%s' % (1,classifier)
     pickle.dump(cv.best_estimator_, open(filename + '_model.pkl', 'wb'))
