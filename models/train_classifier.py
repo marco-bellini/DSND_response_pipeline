@@ -33,7 +33,7 @@ import sklearn.metrics as met
 from sklearn.utils.fixes import signature
 import pickle
 
-from custom_scoring import mo_confusion_matrix, mo_weighted_cm_scorer,mo_weighted_average_precision
+from custom_scoring import mo_confusion_matrix, mo_weighted_cm_scorer,mo_weighted_average_precision, make_scorers
 
 
 def load_data(database_filepath):
@@ -224,15 +224,7 @@ def main():
     class_weights['earthquake']=5
     class_weights['search_and_rescue']=3
 
-    scorerAP = make_scorer(mo_weighted_average_precision, greater_is_better = True,
-                         class_weights=class_weights, adjust_for_frequency=True,
-                         return_single=True)
-
-    scorerCM = make_scorer(mo_weighted_cm_scorer, greater_is_better = True, weights=weights,
-                         class_weights=class_weights, adjust_for_frequency=True,
-                         return_single=True)
-
-    scorers={'AP':scorerAP,'CM':scorerCM}
+    scorers=make_scorers(weights,class_weights)
 
     c=0
     for scorer in scorers.keys():
@@ -245,8 +237,7 @@ def main():
 
 
             #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
-            cv = GridSearchCV(model, scoring=scorers[scorer], param_grid=parameters, verbose=2, cv=cv_folds
-                              n_jobs=4)
+            cv = GridSearchCV(model, scoring=scorers[scorer], param_grid=parameters, verbose=2, cv=cv_folds)
             cv.fit(X_train, y_train)
 
             #print(cv)

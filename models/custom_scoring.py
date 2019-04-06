@@ -9,6 +9,21 @@ from sklearn.utils.fixes import signature
 import pickle
 
 
+def make_scorers(weights,class_weights):
+    scorerAP = make_scorer(mo_weighted_average_precision, greater_is_better = True,
+                         class_weights=class_weights, adjust_for_frequency=True,
+                         return_single=True)
+
+    scorerCM = make_scorer(mo_weighted_cm_scorer, greater_is_better = True, weights=weights,
+                         class_weights=class_weights, adjust_for_frequency=True,
+                         return_single=True)
+
+    scorers={'AP':scorerAP,'CM':scorerCM}
+
+    return(scorers)
+
+
+
 
 def mo_confusion_matrix(y_test, y_pred,as_DataFrame=False):
     """
