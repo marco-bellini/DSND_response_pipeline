@@ -227,34 +227,37 @@ def main():
     scorers=make_scorers(weights,class_weights)
 
     c=0
-    for scorer in scorers.keys():
-        for classifier in pipelines.keys():
-            print(scorer,classifier)
+    # for scorer in scorers.keys():
+    for classifier in pipelines.keys():
+        print(classifier)
 
-            model = pipelines[classifier][0]
-            parameters = pipelines[classifier][1]
-            cv_folds=5
+        model = pipelines[classifier][0]
+        parameters = pipelines[classifier][1]
+        cv_folds=5
 
 
-            #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
-            cv = GridSearchCV(model, scoring=scorers[scorer], param_grid=parameters, verbose=2, cv=cv_folds)
-            cv.fit(X_train, y_train)
+        #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
+        cv = GridSearchCV(model, scoring=scorers, param_grid=parameters, verbose=2, cv=cv_folds)
+        cv.fit(X_train, y_train)
 
-            #print(cv)
+        #print(cv)
 
-            print()
-            print('training finished')
-            print()
+        print()
+        print('training finished')
+        print()
 
-            filename='%d_%s_%s' % (c,scorer,classifier)
-            pickle.dump(cv.best_estimator_, open(filename + '_model.pkl', 'wb'))
-            pickle.dump(cv.best_params_, open(filename + '_params.pkl', 'wb'))
-            pickle.dump(y_test, open(filename + '_ytest.pkl', 'wb'))
+        filename='%d_%s_%s' % (c,scorer,classifier)
+        pickle.dump(cv, open(filename + '_cvAll.pkl', 'wb'))
 
-            y_pred = cv.best_estimator_.predict(X_test)
-            pickle.dump(y_pred, open(filename + '_ypred.pkl', 'wb'))
 
-            c+=1
+        pickle.dump(cv.best_estimator_, open(filename + '_model.pkl', 'wb'))
+        pickle.dump(cv.best_params_, open(filename + '_params.pkl', 'wb'))
+        pickle.dump(y_test, open(filename + '_ytest.pkl', 'wb'))
+
+        y_pred = cv.best_estimator_.predict(X_test)
+        pickle.dump(y_pred, open(filename + '_ypred.pkl', 'wb'))
+
+        c+=1
 
 if __name__ == '__main__':
     main()
