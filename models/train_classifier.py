@@ -237,7 +237,7 @@ def main():
 
 
         #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
-        cv = GridSearchCV(model, scoring=scorers, param_grid=parameters, verbose=2, cv=cv_folds)
+        cv = GridSearchCV(model, scoring=scorers, param_grid=parameters, verbose=2, cv=cv_folds, refit='AP')
         cv.fit(X_train, y_train)
 
         #print(cv)
