@@ -22,6 +22,8 @@ from sklearn.multioutput import MultiOutputClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier,AdaBoostClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import BernoulliNB, MultinomialNB
 
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.model_selection import GridSearchCV
@@ -117,13 +119,60 @@ def mo_confusion_matrix(y_test, y_pred,as_DataFrame=False):
         return (tn, fp, fn, tp)
 
 
+def mo_weighted_average_precision(y_test, y_pred, class_weights=None,
+                          adjust_for_frequency=False,
+                          return_single=True):
+    """
+
+    :param y_test:
+    :param y_pred:
+    :param weights:
+    :param class_weights:
+    :param adjust_for_frequency:
+    :param return_sum:
+    :return:
+    """
+    # score with custom weights for errors
+
+    score = met.average_precision_score(y_test, y_pred)
+
+    if adjust_for_frequency:
+        # adjusting the weights by the frequency
+
+        real_disasters = y_test.sum()
+        total_occurrences =  y_test.count()
+        class_frequency= real_disasters / total_occurrences
+        class_inv_frequencies = 1.0 / class_frequency
+        class_inv_frequencies[real_disasters == 0] = 0
+
+        # normalize the inv. frequencies
+        class_inv_frequencies /= class_inv_frequencies.max()
+        #         print()
+        #         print(class_inv_frequencies)
+        #         print()
+
+        if not class_weights is None:
+            class_weights *= class_inv_frequencies
+        else:
+            # the score is just adjusted by the inverse of frequency
+            class_weights = class_inv_frequencies
+
+    if not class_weights is None:
+        # adjust score by weights
+        score *= class_weights
+
+    if return_single:
+        #return np.sum(np.power(score.values,2.)))
+        return np.sum(score.values)
+    else:
+        return score
 
 
 
 
-def mo_weighted_scorer(y_test, y_pred, weights={'tp': 1, 'tn': 1, 'fn': 1, 'fp': 1}, class_weights=None,
-                       adjust_for_frequency=False,
-                       return_single=True):
+def mo_weighted_cm_scorer(y_test, y_pred, weights={'tp': 1, 'tn': 1, 'fn': 1, 'fp': 1}, class_weights=None,
+                          adjust_for_frequency=False,
+                          return_single=True):
     """
 
     :param y_test:
@@ -142,9 +191,17 @@ def mo_weighted_scorer(y_test, y_pred, weights={'tp': 1, 'tn': 1, 'fn': 1, 'fp':
     if adjust_for_frequency:
         # adjusting the weights by the frequency
 
-        real_disasters = tp + fn
-        class_inv_frequencies = 1.0 / real_disasters
+        # real_disasters = tp + fn
+        # class_inv_frequencies = 1.0 / real_disasters
+
+        real_disasters = y_test.sum()
+        total_occurrences =  y_test.count()
+        class_frequency= real_disasters / total_occurrences
+        class_inv_frequencies = 1.0 / class_frequency
         class_inv_frequencies[real_disasters == 0] = 0
+
+        class_inv_frequencies[real_disasters == 0] = 0
+
         # normalize the inv. frequencies
         class_inv_frequencies /= class_inv_frequencies.max()
         #         print()
@@ -221,8 +278,58 @@ def create_pipelines():
         'clf__estimator__n_estimators': [20,50, 100],
     }
 
+    pipe_RandomForest = Pipeline([
+        ('vect', CountVectorizer(tokenizer=tokenize)),
+        ('tfidf', TfidfTransformer()),
+        ('clf', MultiOutputClassifier(RandomForestClassifier())),
+    ])
+    par_RandomForest = {
+        'vect__ngram_range': ((1, 1), (1, 2)),
+        'vect__max_df': (0.75, 1.0),
+        'clf__estimator__n_estimators': [20,50, 100],
+    }
 
-    pipelines={'RF':[pipe_RandomForest,par_RandomForest] , 'DT':[pipe_DecisionTree,par_DecisionTree]}
+    pipe_LogisticReg = Pipeline([
+        ('vect', CountVectorizer(tokenizer=tokenize)),
+        ('tfidf', TfidfTransformer()),
+        ('clf', MultiOutputClassifier(LogisticRegression(multi_class='ovr'))),
+    ])
+    par_LogisticReg = {
+        'vect__ngram_range': ((1, 1), (1, 2)),
+        'vect__max_df': (0.75, 1.0),
+        'clf__estimator__C': [1,0.8,0.5,.2],
+    }
+
+    pipe_MultinomialNB = Pipeline([
+        ('vect', CountVectorizer(tokenizer=tokenize)),
+        ('tfidf', TfidfTransformer()),
+        ('clf', MultiOutputClassifier(MultinomialNB())),
+    ])
+    par_MultinomialNB = {
+        'vect__ngram_range': ((1, 1), (1, 2)),
+        'vect__max_df': (0.75, 1.0),
+        'clf__estimator__alpha': [1,0.5,.0],
+    }
+
+    pipe_GradBoost= Pipeline([
+        ('vect', CountVectorizer(tokenizer=tokenize)),
+        ('tfidf', TfidfTransformer()),
+        ('clf', MultiOutputClassifier(GradientBoostingClassifier())),
+    ])
+    par_GradBoost = {
+        'vect__ngram_range': ((1, 1), (1, 2)),
+        'vect__max_df': (0.75, 1.0),
+        'clf__estimator__learning_rate': [0.1,0.05,0.2,0.5],
+        'clf__estimator__n_estimators': [100,200,500],
+        'clf__estimator__max_depth': [3,5,7],
+    }
+
+
+    pipelines={'RF':[pipe_RandomForest,par_RandomForest] , 'DT':[pipe_DecisionTree,par_DecisionTree],
+               'LR':[pipe_LogisticReg,par_LogisticReg],'MN':[pipe_MultinomialNB,par_MultinomialNB],
+               'GB':[pipe_GradBoost,par_GradBoost]
+
+               }
     return(pipelines)
 
 
@@ -246,38 +353,45 @@ def main():
     class_weights['earthquake']=5
     class_weights['search_and_rescue']=3
 
-
-    scorer = make_scorer(mo_weighted_scorer,greater_is_better = True ,weights=weights,
-                         class_weights=class_weights,adjust_for_frequency=True,
+    scorerAP = make_scorer(mo_weighted_average_precision, greater_is_better = True,
+                         class_weights=class_weights, adjust_for_frequency=True,
                          return_single=True)
 
-    for classifier in pipelines.keys():
-        print(classifier)
+    scorerCM = make_scorer(mo_weighted_cm_scorer, greater_is_better = True, weights=weights,
+                         class_weights=class_weights, adjust_for_frequency=True,
+                         return_single=True)
 
-        model = pipelines[classifier][0]
-        parameters = pipelines[classifier][1]
-        cv_folds=5
+    scorers={'AP':scorerAP,'CM':scorerCM}
 
+    c=0
+    for scorer in scorers.keys():
+        for classifier in pipelines.keys():
+            print(scorer,classifier)
 
-        #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
-        cv = GridSearchCV(model, scoring=scorer, param_grid=parameters, verbose=2, cv=cv_folds)
-        cv.fit(X_train, y_train)
-
-        #print(cv)
-
-        print()
-        print('training finished')
-        print()
-
-        filename='%s_%s' % ('04_0.2_w',classifier)
-        pickle.dump(cv.best_estimator_, open(filename + '_model.pkl', 'wb'))
-        pickle.dump(cv.best_params_, open(filename + '_params.pkl', 'wb'))
-        pickle.dump(y_test, open(filename + '_ytest.pkl', 'wb'))
-        
-        y_pred = cv.best_estimator_.predict(X_test)
-        pickle.dump(y_pred, open(filename + '_ypred.pkl', 'wb'))
+            model = pipelines[classifier][0]
+            parameters = pipelines[classifier][1]
+            cv_folds=5
 
 
+            #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
+            cv = GridSearchCV(model, scoring=scorers[scorer], param_grid=parameters, verbose=2, cv=cv_folds)
+            cv.fit(X_train, y_train)
+
+            #print(cv)
+
+            print()
+            print('training finished')
+            print()
+
+            filename='%d_%s_%s' % (c,scorer,classifier)
+            pickle.dump(cv.best_estimator_, open(filename + '_model.pkl', 'wb'))
+            pickle.dump(cv.best_params_, open(filename + '_params.pkl', 'wb'))
+            pickle.dump(y_test, open(filename + '_ytest.pkl', 'wb'))
+
+            y_pred = cv.best_estimator_.predict(X_test)
+            pickle.dump(y_pred, open(filename + '_ypred.pkl', 'wb'))
+
+            c+=1
 
 if __name__ == '__main__':
     main()
