@@ -7,6 +7,8 @@ from sklearn.metrics import make_scorer, accuracy_score, f1_score, fbeta_score, 
 import sklearn.metrics as met
 from sklearn.utils.fixes import signature
 import pickle
+import numpy as np
+
 
 
 def make_scorers(weights,class_weights):

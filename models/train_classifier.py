@@ -217,12 +217,14 @@ def main():
     weights={'tp':2,'tn':.001,'fn':1,'fp':.1}
     class_weights=y_test.iloc[0,:]*0.0+1
     class_weights['child_alone']=0 # no support data
-    class_weights['death']=5
-    class_weights['floods']=2
-    class_weights['fire']=4
-    class_weights['storm']=2
-    class_weights['earthquake']=5
-    class_weights['search_and_rescue']=3
+    class_weights['death']=20
+    class_weights['floods']=20
+    class_weights['fire']=20
+    class_weights['storm']=20
+    class_weights['earthquake']=20
+    class_weights['search_and_rescue'] = 10
+    class_weights['medical_help'] = 10
+    class_weights['shelter'] = 10
 
     scorers=make_scorers(weights,class_weights)
 
