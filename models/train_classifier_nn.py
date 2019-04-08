@@ -262,7 +262,7 @@ def construct_deepnn_architecture(num_input_features,num_output_features):
     dnn_model.add(Activation('softmax'))
 
     dnn_model.compile(loss='categorical_crossentropy', optimizer='adam',
-                      metrics=['accuracy'])
+                      metrics=['precision','recall'])
     return dnn_model
 
 def main():
@@ -352,7 +352,7 @@ def main():
 
     w2v_dnn = construct_deepnn_architecture(num_input_features=500,num_output_features=num_classes)
     epochs=20
-    saver = tensorflow.train.Saver()
+    
 
     if 1:
 
@@ -364,7 +364,7 @@ def main():
         if single_out:
             predictions = le.inverse_transform(y_pred)
 
-        w2v_dnn.save('w2v_model.h5')
+        w2v_dnn.save('w2v_model_pr.h5')
 
     if 0:
         glove_dnn = construct_deepnn_architecture(num_input_features=300)

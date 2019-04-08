@@ -163,7 +163,7 @@ def create_pipelines():
     pipe_LogisticReg = Pipeline([
         ('vect', CountVectorizer(tokenizer=tokenize)),
         ('tfidf', TfidfTransformer()),
-        ('clf', MultiOutputClassifier(LogisticRegression(multi_class='ovr'))),
+        ('clf', MultiOutputClassifier(LogisticRegression())),
     ])
     par_LogisticReg = {
         'vect__ngram_range': ((1, 1), (1, 2)),
@@ -195,12 +195,20 @@ def create_pipelines():
         'clf__estimator__max_depth': [3,5,7],
     }
 
-
-    pipelines={'RF':[pipe_RandomForest,par_RandomForest] , 'DT':[pipe_DecisionTree,par_DecisionTree],
+    if 0:
+        pipelines={'RF':[pipe_RandomForest,par_RandomForest] , 'DT':[pipe_DecisionTree,par_DecisionTree],
                'LR':[pipe_LogisticReg,par_LogisticReg],'MN':[pipe_MultinomialNB,par_MultinomialNB],
+               'GB':[pipe_GradBoost,par_GradBoost]
+               }
+
+    pipelines={#'LR':[pipe_LogisticReg,par_LogisticReg],
+               'MN':[pipe_MultinomialNB,par_MultinomialNB],
                'GB':[pipe_GradBoost,par_GradBoost]
 
                }
+
+
+
     return(pipelines)
 
 
@@ -228,7 +236,7 @@ def main():
 
     scorers=make_scorers(weights,class_weights)
 
-    c=0
+    c=2
     # for scorer in scorers.keys():
     for classifier in pipelines.keys():
         print(classifier)
