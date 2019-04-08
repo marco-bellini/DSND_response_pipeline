@@ -275,7 +275,7 @@ def main():
 
     # encoding
     le = LabelEncoder()
-    num_classes = 2
+    num_classes = y_train.columns.shape[0]
 
     # tokenize train reviews & encode train labels
     print("tokenization")
@@ -286,7 +286,7 @@ def main():
     y_tr = le.fit_transform(yout_train)
     y_train = keras.utils.to_categorical(y_tr, num_classes)
     # tokenize test reviews & encode test labels
-    tokenized_test = [tokenize(text)
+    tokenized_test = [tn.tokenizer.tokenize(text)
                       for text in X_test]
     y_ts = le.fit_transform(yout_test)
     y_test = keras.utils.to_categorical(y_ts, num_classes)
@@ -306,10 +306,10 @@ def main():
     # feature engineering with GloVe model
     print("GloVe")
     train_nlp = [nlp(item) for item in X_train]
-    train_glove_features = np.array([item.vector for item in yout_test])
+    train_glove_features = yout_train.values
 
     test_nlp = [nlp(item) for item in X_test]
-    test_glove_features = np.array([item.vector for item in yout_test])
+    test_glove_features = yout_test.values
 
     print('Word2Vec model:> Train features shape:', avg_wv_train_features.shape, ' Test features shape:',
           avg_wv_test_features.shape)
