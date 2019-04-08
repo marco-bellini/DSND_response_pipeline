@@ -217,6 +217,42 @@ def create_pipelines():
                }
     return(pipelines)
 
+def averaged_word2vec_vectorizer(corpus, model, num_features):
+    vocabulary = set(model.wv.index2word)
+
+    def average_word_vectors(words, model, vocabulary, num_features):
+        feature_vector = np.zeros((num_features,), dtype="float64")
+        nwords = 0.
+
+        for word in words:
+            if word in vocabulary:
+                nwords = nwords + 1.
+                feature_vector = np.add(feature_vector, model[word])
+        if nwords:
+            feature_vector = np.divide(feature_vector, nwords)
+
+        return feature_vector
+
+    features = [average_word_vectors(tokenized_sentence, model, vocabulary, num_features)
+                for tokenized_sentence in corpus]
+    return np.array(features)
+
+
+
+def construct_deepnn_architecture(num_input_features):
+    dnn_model = Sequential()
+    dnn_model.add(Dense(512, activation='relu', input_shape=(num_input_features,)))
+    dnn_model.add(Dropout(0.2))
+    dnn_model.add(Dense(512, activation='relu'))
+    dnn_model.add(Dropout(0.2))
+    dnn_model.add(Dense(512, activation='relu'))
+    dnn_model.add(Dropout(0.2))
+    dnn_model.add(Dense(2))
+    dnn_model.add(Activation('softmax'))
+
+    dnn_model.compile(loss='categorical_crossentropy', optimizer='adam',
+                      metrics=['accuracy'])
+    return dnn_model
 
 def main():
 
@@ -226,74 +262,71 @@ def main():
     print('database loaded')
     print('X:', X.shape)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
+    X_train, X_test, yout_train, yout_test = train_test_split(X, Y, test_size=0.2)
 
 
-
+    # encoding
     le = LabelEncoder()
     num_classes = y_train.columns.shape[0]
 
     # tokenize train reviews & encode train labels
-    tokenized_train = [tn.tokenizer.tokenize(text)
-                       for text in norm_train_reviews]
-    y_tr = le.fit_transform(train_sentiments)
+    tokenized_train = [tokenize(text)  for text in X_train]
+
+    y_tr = le.fit_transform(yout_train)
     y_train = keras.utils.to_categorical(y_tr, num_classes)
     # tokenize test reviews & encode test labels
     tokenized_test = [tn.tokenizer.tokenize(text)
-                      for text in norm_test_reviews]
-    y_ts = le.fit_transform(test_sentiments)
+                      for text in X_test]
+    y_ts = le.fit_transform(yout_test)
     y_test = keras.utils.to_categorical(y_ts, num_classes)
 
+    # build word2vec model
+    w2v_num_features = 500
+    w2v_model = gensim.models.Word2Vec(tokenized_train, size=w2v_num_features, window=150,
+                                       min_count=10, sample=1e-3)
+
+    # generate averaged word vector features from word2vec model
+    avg_wv_train_features = averaged_word2vec_vectorizer(corpus=tokenized_train, model=w2v_model,
+                                                         num_features=500)
+    avg_wv_test_features = averaged_word2vec_vectorizer(corpus=tokenized_test, model=w2v_model,
+                                                        num_features=500)
+
+    # feature engineering with GloVe model
+    train_nlp = [tn.nlp(item) for item in X_train]
+    train_glove_features = np.array([item.vector for item in yout_test])
+
+    test_nlp = [tn.nlp(item) for item in X_test]
+    test_glove_features = np.array([item.vector for item in yout_test])
+
+    print('Word2Vec model:> Train features shape:', avg_wv_train_features.shape, ' Test features shape:',
+          avg_wv_test_features.shape)
+    print('GloVe model:> Train features shape:', train_glove_features.shape, ' Test features shape:',
+          test_glove_features.shape)
+
+    w2v_dnn = construct_deepnn_architecture(num_input_features=500)
+
+    if 0:
+        batch_size = 100
+        w2v_dnn.fit(avg_wv_train_features, y_train, epochs=5, batch_size=batch_size,
+                    shuffle=True, validation_split=0.1, verbose=1)
+
+        y_pred = w2v_dnn.predict_classes(avg_wv_test_features)
+        predictions = le.inverse_transform(y_pred)
 
 
-    pipelines=create_pipelines()
+    if 0:
+        glove_dnn = construct_deepnn_architecture(num_input_features=300)
 
-    weights={'tp':2,'tn':.001,'fn':1,'fp':.1}
-    class_weights=y_test.iloc[0,:]*0.0+1
-    class_weights['child_alone']=0 # no support data
-    class_weights['death']=20
-    class_weights['floods']=20
-    class_weights['fire']=20
-    class_weights['storm']=20
-    class_weights['earthquake']=20
-    class_weights['search_and_rescue'] = 10
-    class_weights['medical_help'] = 10
-    class_weights['shelter'] = 10
+        batch_size = 100
+        glove_dnn.fit(train_glove_features, y_train, epochs=5, batch_size=batch_size,
+                      shuffle=True, validation_split=0.1, verbose=1)
 
-    scorers=make_scorers(weights,class_weights)
-
-    c=0
-    # for scorer in scorers.keys():
-    for classifier in pipelines.keys():
-        print(classifier)
-
-        model = pipelines[classifier][0]
-        parameters = pipelines[classifier][1]
-        cv_folds=5
+        y_pred = glove_dnn.predict_classes(test_glove_features)
+        predictions = le.inverse_transform(y_pred)
 
 
-        #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
-        cv = GridSearchCV(model, scoring=scorers, param_grid=parameters, verbose=2, cv=cv_folds, refit='AP')
-        cv.fit(X_train, y_train)
-
-        #print(cv)
-
-        print()
-        print('training finished')
-        print()
-
-        filename='%d_%s_%s' % (c,scorer,classifier)
-        pickle.dump(cv, open(filename + '_cvAll.pkl', 'wb'))
 
 
-        pickle.dump(cv.best_estimator_, open(filename + '_model.pkl', 'wb'))
-        pickle.dump(cv.best_params_, open(filename + '_params.pkl', 'wb'))
-        pickle.dump(y_test, open(filename + '_ytest.pkl', 'wb'))
-
-        y_pred = cv.best_estimator_.predict(X_test)
-        pickle.dump(y_pred, open(filename + '_ypred.pkl', 'wb'))
-
-        c+=1
 
 if __name__ == '__main__':
     main()
