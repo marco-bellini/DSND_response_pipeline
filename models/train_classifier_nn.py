@@ -37,20 +37,29 @@ from custom_scoring import mo_confusion_matrix, mo_weighted_cm_scorer,mo_weighte
 
 
 #######
-from keras.preprocessing import sequence
+from tensorflow.keras import backend
+
+from tensorflow.keras.preprocessing import sequence
 from sklearn.preprocessing import LabelEncoder
 
 import gensim
-import keras
 
-from keras.models import Sequential
-from keras.layers import Dense, Embedding, Dropout, Activation, SpatialDropout1D
-from keras.layers import LSTM
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Embedding, Dropout, Activation, SpatialDropout1D
+from tensorflow.keras.layers import LSTM
 from sklearn.preprocessing import LabelEncoder
 
 import spacy
 
 nlp = spacy.load('en_core_web_sm', parse = False, tag=False, entity=False)
+
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
+from tensorflow.python.client import device_lib
+print(device_lib.list_local_devices())
+
 
 def load_data(database_filepath):
     """
@@ -241,7 +250,7 @@ def averaged_word2vec_vectorizer(corpus, model, num_features):
 
 
 
-def construct_deepnn_architecture(num_input_features):
+def construct_deepnn_architecture(num_input_features,num_output_features):
     dnn_model = Sequential()
     dnn_model.add(Dense(512, activation='relu', input_shape=(num_input_features,)))
     dnn_model.add(Dropout(0.2))
@@ -249,7 +258,7 @@ def construct_deepnn_architecture(num_input_features):
     dnn_model.add(Dropout(0.2))
     dnn_model.add(Dense(512, activation='relu'))
     dnn_model.add(Dropout(0.2))
-    dnn_model.add(Dense(2))
+    dnn_model.add(Dense(  num_output_features  ))
     dnn_model.add(Activation('softmax'))
 
     dnn_model.compile(loss='categorical_crossentropy', optimizer='adam',
@@ -265,9 +274,15 @@ def main():
     print('X:', X.shape)
 
     # quick check
-    max_ind=300
+    max_ind=X.shape[0]+1
     X=X.loc[0:max_ind]
-    Y=Y.loc[0:max_ind,'death']
+
+    single_out=False
+
+    if single_out:
+        Y=Y.loc[0:max_ind,'death']
+    else:
+        Y=Y.loc[0:max_ind,:]
 
 
     X_train, X_test, yout_train, yout_test = train_test_split(X, Y, test_size=0.2)
@@ -275,21 +290,40 @@ def main():
 
     # encoding
     le = LabelEncoder()
-    num_classes = y_train.columns.shape[0]
+    if single_out:
+        num_classes = 2
+    else:
+        num_classes = yout_train.columns.shape[0]
+
+    print('num_classes:',num_classes)
 
     # tokenize train reviews & encode train labels
     print("tokenization")
     tokenized_train = [tokenize(text)  for text in X_train]
 
-    print(tokenized_train)
+    #print(tokenized_train)
+    if single_out:
+        y_tr = le.fit_transform(yout_train)
+        y_train = keras.utils.to_categorical(y_tr, num_classes)
+    else:
+        y_train= yout_train.values
 
-    y_tr = le.fit_transform(yout_train)
-    y_train = keras.utils.to_categorical(y_tr, num_classes)
+
+    #print(y_train)
+
     # tokenize test reviews & encode test labels
-    tokenized_test = [tn.tokenizer.tokenize(text)
-                      for text in X_test]
-    y_ts = le.fit_transform(yout_test)
-    y_test = keras.utils.to_categorical(y_ts, num_classes)
+    tokenized_test = [tokenize(text) for text in X_test]
+    
+    if single_out:
+        y_tr = le.fit_transform(yout_train)
+        y_train = tensorflow.keras.utils.to_categorical(y_ts, num_classes)
+        y_te = le.fit_transform(yout_test)
+        y_test = tensorflow.keras.utils.to_categorical(y_te, num_classes)
+    else:
+        y_train= yout_train.values
+        y_test= yout_train.values
+
+
 
     # build word2vec model
     print("word2vec")
@@ -316,22 +350,27 @@ def main():
     print('GloVe model:> Train features shape:', train_glove_features.shape, ' Test features shape:',
           test_glove_features.shape)
 
-    w2v_dnn = construct_deepnn_architecture(num_input_features=500)
+    w2v_dnn = construct_deepnn_architecture(num_input_features=500,num_output_features=num_classes)
+    epochs=20
+    saver = tensorflow.train.Saver()
 
-    if 0:
+    if 1:
+
         batch_size = 100
-        w2v_dnn.fit(avg_wv_train_features, y_train, epochs=5, batch_size=batch_size,
+        w2v_dnn.fit(avg_wv_train_features, y_train, epochs=epochs, batch_size=batch_size,
                     shuffle=True, validation_split=0.1, verbose=1)
 
         y_pred = w2v_dnn.predict_classes(avg_wv_test_features)
-        predictions = le.inverse_transform(y_pred)
+        if single_out:
+            predictions = le.inverse_transform(y_pred)
 
+        w2v_dnn.save('w2v_model.h5')
 
     if 0:
         glove_dnn = construct_deepnn_architecture(num_input_features=300)
 
         batch_size = 100
-        glove_dnn.fit(train_glove_features, y_train, epochs=5, batch_size=batch_size,
+        glove_dnn.fit(train_glove_features, y_train, epochs=epochs, batch_size=batch_size,
                       shuffle=True, validation_split=0.1, verbose=1)
 
         y_pred = glove_dnn.predict_classes(test_glove_features)
