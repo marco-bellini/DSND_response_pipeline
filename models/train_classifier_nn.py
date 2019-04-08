@@ -48,7 +48,9 @@ from keras.layers import Dense, Embedding, Dropout, Activation, SpatialDropout1D
 from keras.layers import LSTM
 from sklearn.preprocessing import LabelEncoder
 
+import spacy
 
+nlp = spacy.load('en_core_web_sm', parse = False, tag=False, entity=False)
 
 def load_data(database_filepath):
     """
@@ -262,25 +264,35 @@ def main():
     print('database loaded')
     print('X:', X.shape)
 
+    # quick check
+    max_ind=300
+    X=X.loc[0:max_ind]
+    Y=Y.loc[0:max_ind,'death']
+
+
     X_train, X_test, yout_train, yout_test = train_test_split(X, Y, test_size=0.2)
 
 
     # encoding
     le = LabelEncoder()
-    num_classes = y_train.columns.shape[0]
+    num_classes = 2
 
     # tokenize train reviews & encode train labels
+    print("tokenization")
     tokenized_train = [tokenize(text)  for text in X_train]
+
+    print(tokenized_train)
 
     y_tr = le.fit_transform(yout_train)
     y_train = keras.utils.to_categorical(y_tr, num_classes)
     # tokenize test reviews & encode test labels
-    tokenized_test = [tn.tokenizer.tokenize(text)
+    tokenized_test = [tokenize(text)
                       for text in X_test]
     y_ts = le.fit_transform(yout_test)
     y_test = keras.utils.to_categorical(y_ts, num_classes)
 
     # build word2vec model
+    print("word2vec")
     w2v_num_features = 500
     w2v_model = gensim.models.Word2Vec(tokenized_train, size=w2v_num_features, window=150,
                                        min_count=10, sample=1e-3)
@@ -292,10 +304,11 @@ def main():
                                                         num_features=500)
 
     # feature engineering with GloVe model
-    train_nlp = [tn.nlp(item) for item in X_train]
+    print("GloVe")
+    train_nlp = [nlp(item) for item in X_train]
     train_glove_features = np.array([item.vector for item in yout_test])
 
-    test_nlp = [tn.nlp(item) for item in X_test]
+    test_nlp = [nlp(item) for item in X_test]
     test_glove_features = np.array([item.vector for item in yout_test])
 
     print('Word2Vec model:> Train features shape:', avg_wv_train_features.shape, ' Test features shape:',
