@@ -231,7 +231,8 @@ def main():
     c=0
     # for scorer in scorers.keys():
     for classifier in pipelines.keys():
-        print(classifier)
+        filename='%d_%s' % (c,classifier)
+        print(filename)
 
         model = pipelines[classifier][0]
         parameters = pipelines[classifier][1]
@@ -248,7 +249,6 @@ def main():
         print('training finished')
         print()
 
-        filename='%d_%s_%s' % (c,scorer,classifier)
         pickle.dump(cv, open(filename + '_cvAll.pkl', 'wb'))
 
 
