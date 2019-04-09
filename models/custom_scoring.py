@@ -21,7 +21,7 @@ def make_scorers(weights,class_weights):
                          return_single=True)
 
     scorers={'AP':scorerAP,'CM':scorerCM}
-
+    print(scorerAP, scorerCM)
     return(scorers)
 
 

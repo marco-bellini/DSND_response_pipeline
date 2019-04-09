@@ -203,7 +203,7 @@ def create_pipelines():
 
     pipelines={#'LR':[pipe_LogisticReg,par_LogisticReg],
                'MN':[pipe_MultinomialNB,par_MultinomialNB],
-               'GB':[pipe_GradBoost,par_GradBoost]
+               #'GB':[pipe_GradBoost,par_GradBoost]
 
                }
 
@@ -240,6 +240,8 @@ def main():
     # for scorer in scorers.keys():
     for classifier in pipelines.keys():
         print(classifier)
+        filename='%d_%s' % (c,classifier)
+        print(filename)
 
         model = pipelines[classifier][0]
         parameters = pipelines[classifier][1]
@@ -256,7 +258,6 @@ def main():
         print('training finished')
         print()
 
-        filename='%d_%s_%s' % (c,scorer,classifier)
         pickle.dump(cv, open(filename + '_cvAll.pkl', 'wb'))
 
 
