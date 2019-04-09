@@ -33,17 +33,26 @@ import sklearn.metrics as met
 from sklearn.utils.fixes import signature
 import pickle
 
-#from custom_scoring import mo_confusion_matrix, mo_weighted_cm_scorer,mo_weighted_average_precision, make_scorers
+from custom_scoring import mo_confusion_matrix, mo_weighted_cm_scorer,mo_weighted_average_precision, make_scorers
 
 
+def load_data(database_filepath):
+    """
+
+    :param database_filepath:
+    :return:
+    """
+
+    # database_filepath='sqlite:///data//InsertDatabaseName.db'
 
 
-def load_data_single(y_set):
+    engine = create_engine(database_filepath)
+    df = pd.read_sql_table('InsertTableName', engine)
+    X = df['message']
+    Y = df.iloc[:, 4:]
+    category_names=list(df.columns)
 
-    X = pd.read_pickle(r'../data/Xinput.pkl')
-    Y = pd.read_pickle(r'../data/Y%s.pkl' % y_set)
-
-    return(X,Y)
+    return(X,Y,category_names)
 
 
 def tokenize(text):
@@ -112,7 +121,7 @@ def udacity_main():
         print('Please provide the filepath of the disaster messages database '\
               'as the first argument and the filepath of the pickle file to '\
               'save the model to as the second argument. \n\nExample: python '\
-              'train_classifier_perf_all.py ../data/DisasterResponse.db classifier.pkl')
+              'train_classifier_perf_single.py ../data/DisasterResponse.db classifier.pkl')
 
 def create_pipelines():
     """
@@ -123,7 +132,7 @@ def create_pipelines():
     pipe_DecisionTree = Pipeline([
         ('vect', CountVectorizer(tokenizer=tokenize)),
         ('tfidf', TfidfTransformer()),
-        ('clf', DecisionTreeClassifier()),
+        ('clf', MultiOutputClassifier(DecisionTreeClassifier())),
     ])
     par_DecisionTree = {
         'clf__estimator__min_samples_split': [0.1, .9],
@@ -132,7 +141,7 @@ def create_pipelines():
     pipe_RandomForest = Pipeline([
         ('vect', CountVectorizer(tokenizer=tokenize)),
         ('tfidf', TfidfTransformer()),
-        ('clf', RandomForestClassifier()),
+        ('clf', MultiOutputClassifier(RandomForestClassifier())),
     ])
     par_RandomForest = {
         'vect__ngram_range': ((1, 1), (1, 2)),
@@ -143,7 +152,7 @@ def create_pipelines():
     pipe_RandomForest = Pipeline([
         ('vect', CountVectorizer(tokenizer=tokenize)),
         ('tfidf', TfidfTransformer()),
-        ('clf', RandomForestClassifier()),
+        ('clf', MultiOutputClassifier(RandomForestClassifier())),
     ])
     par_RandomForest = {
         'vect__ngram_range': ((1, 1), (1, 2)),
@@ -154,7 +163,7 @@ def create_pipelines():
     pipe_LogisticReg = Pipeline([
         ('vect', CountVectorizer(tokenizer=tokenize)),
         ('tfidf', TfidfTransformer()),
-        ('clf', LogisticRegression()),
+        ('clf', MultiOutputClassifier(LogisticRegression())),
     ])
     par_LogisticReg = {
         'vect__ngram_range': ((1, 1), (1, 2)),
@@ -165,7 +174,7 @@ def create_pipelines():
     pipe_MultinomialNB = Pipeline([
         ('vect', CountVectorizer(tokenizer=tokenize)),
         ('tfidf', TfidfTransformer()),
-        ('clf', MultinomialNB()),
+        ('clf', MultiOutputClassifier(MultinomialNB())),
     ])
     par_MultinomialNB = {
         'vect__ngram_range': ((1, 1), (1, 2)),
@@ -176,7 +185,7 @@ def create_pipelines():
     pipe_GradBoost= Pipeline([
         ('vect', CountVectorizer(tokenizer=tokenize)),
         ('tfidf', TfidfTransformer()),
-        ('clf', GradientBoostingClassifier()),
+        ('clf', MultiOutputClassifier(GradientBoostingClassifier())),
     ])
     par_GradBoost = {
         'vect__ngram_range': ((1, 1), (1, 2)),
@@ -186,10 +195,18 @@ def create_pipelines():
         'clf__estimator__max_depth': [3,5,7],
     }
 
-    pipelines={ 'DT':[pipe_DecisionTree,par_DecisionTree],
-           'LR':[pipe_LogisticReg,par_LogisticReg],'MN':[pipe_MultinomialNB,par_MultinomialNB],
-           'GB':[pipe_GradBoost,par_GradBoost],'RF':[pipe_RandomForest,par_RandomForest]
-           }
+    if 0:
+        pipelines={'RF':[pipe_RandomForest,par_RandomForest] , 'DT':[pipe_DecisionTree,par_DecisionTree],
+               'LR':[pipe_LogisticReg,par_LogisticReg],'MN':[pipe_MultinomialNB,par_MultinomialNB],
+               'GB':[pipe_GradBoost,par_GradBoost]
+               }
+
+    pipelines={#'LR':[pipe_LogisticReg,par_LogisticReg],
+               'MN':[pipe_MultinomialNB,par_MultinomialNB],
+               #'GB':[pipe_GradBoost,par_GradBoost]
+
+               }
+
 
 
     return(pipelines)
@@ -197,32 +214,42 @@ def create_pipelines():
 
 def main():
 
-    col='food'
-
-    X, Y  = load_data_single(col)
+    database_filepath = 'sqlite:///'+'..//data//InsertDatabaseName.db'
+    X, Y, category_names = load_data(database_filepath)
     print('database loaded')
     print('X:', X.shape)
 
     X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
     pipelines=create_pipelines()
 
+    weights={'tp':2,'tn':.001,'fn':1,'fp':.1}
+    class_weights=y_test.iloc[0,:]*0.0+1
+    class_weights['child_alone']=0 # no support data
+    class_weights['death']=20
+    class_weights['floods']=20
+    class_weights['fire']=20
+    class_weights['storm']=20
+    class_weights['earthquake']=20
+    class_weights['search_and_rescue'] = 10
+    class_weights['medical_help'] = 10
+    class_weights['shelter'] = 10
 
+    scorers=make_scorers(weights,class_weights)
 
-    scorer='AP'
-
-
+    c=2
     # for scorer in scorers.keys():
     for classifier in pipelines.keys():
         print(classifier)
-        filename='%s_%s_%s' % (col,scorer,classifier)
+        filename='%d_%s' % (c,classifier)
         print(filename)
 
         model = pipelines[classifier][0]
         parameters = pipelines[classifier][1]
-        cv_folds=3
+        cv_folds=5
+
 
         #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
-        cv = GridSearchCV(model, scoring=met.average_precision_score, param_grid=parameters, verbose=2, cv=cv_folds, refit='AP')
+        cv = GridSearchCV(model, scoring=scorers, param_grid=parameters, verbose=2, cv=cv_folds, refit='AP')
         cv.fit(X_train, y_train)
 
         #print(cv)
@@ -241,7 +268,7 @@ def main():
         y_pred = cv.best_estimator_.predict(X_test)
         pickle.dump(y_pred, open(filename + '_ypred.pkl', 'wb'))
 
-
+        c+=1
 
 if __name__ == '__main__':
     main()
