@@ -127,7 +127,6 @@ def create_pipelines():
     ])
     par_DecisionTree = {
         'clf__estimator__min_samples_split': [0.1, .9],
-        'clf__class_weight':[ { 0:1, 1:1 }, { 0:1, 1:5 },{ 0:1, 1:50 }, { 0:1, 1:500 }, { 0:1, 1:5000 }, { 0:1, 1:50000 } ]
     }
 
     pipe_RandomForest = Pipeline([
@@ -136,11 +135,20 @@ def create_pipelines():
         ('clf', RandomForestClassifier()),
     ])
     par_RandomForest = {
-        # 'vect__ngram_range': ((1, 1), (1, 2)),
-        # 'vect__max_df': (0.75, 1.0),
+        'vect__ngram_range': ((1, 1), (1, 2)),
+        'vect__max_df': (0.75, 1.0),
         'clf__estimator__n_estimators': [20,50, 100],
-        'clf__class_weight': [{0: 1, 1: 1}, {0: 1, 1: 5}, {0: 1, 1: 50}, {0: 1, 1: 500}, {0: 1, 1: 5000},
-                              {0: 1, 1: 50000}]
+    }
+
+    pipe_RandomForest = Pipeline([
+        ('vect', CountVectorizer(tokenizer=tokenize)),
+        ('tfidf', TfidfTransformer()),
+        ('clf', RandomForestClassifier()),
+    ])
+    par_RandomForest = {
+        'vect__ngram_range': ((1, 1), (1, 2)),
+        'vect__max_df': (0.75, 1.0),
+        'clf__estimator__n_estimators': [20,50, 100],
     }
 
     pipe_LogisticReg = Pipeline([
@@ -149,18 +157,38 @@ def create_pipelines():
         ('clf', LogisticRegression()),
     ])
     par_LogisticReg = {
-        # 'vect__ngram_range': ((1, 1), (1, 2)),
-        # 'vect__max_df': (0.75, 1.0),
-        # 'clf__estimator__C': [1,0.8,0.5,.2],
-        'clf__class_weight': [{0: 1, 1: 1}, {0: 1, 1: 5}, {0: 1, 1: 50}, {0: 1, 1: 500}, {0: 1, 1: 5000},
-                              {0: 1, 1: 50000}]
+        'vect__ngram_range': ((1, 1), (1, 2)),
+        'vect__max_df': (0.75, 1.0),
+        'clf__estimator__C': [1,0.8,0.5,.2],
     }
 
+    pipe_MultinomialNB = Pipeline([
+        ('vect', CountVectorizer(tokenizer=tokenize)),
+        ('tfidf', TfidfTransformer()),
+        ('clf', MultinomialNB()),
+    ])
+    par_MultinomialNB = {
+        'vect__ngram_range': ((1, 1), (1, 2)),
+        'vect__max_df': (0.75, 1.0),
+        'clf__estimator__alpha': [1,0.5,.0],
+    }
 
+    pipe_GradBoost= Pipeline([
+        ('vect', CountVectorizer(tokenizer=tokenize)),
+        ('tfidf', TfidfTransformer()),
+        ('clf', GradientBoostingClassifier()),
+    ])
+    par_GradBoost = {
+        'vect__ngram_range': ((1, 1), (1, 2)),
+        'vect__max_df': (0.75, 1.0),
+        'clf__estimator__learning_rate': [0.1,0.05,0.2,0.5],
+        'clf__estimator__n_estimators': [100,200,500],
+        'clf__estimator__max_depth': [3,5,7],
+    }
 
     pipelines={ 'DT':[pipe_DecisionTree,par_DecisionTree],
-           'LR':[pipe_LogisticReg,par_LogisticReg],
-           'RF':[pipe_RandomForest,par_RandomForest]
+           'LR':[pipe_LogisticReg,par_LogisticReg],'MN':[pipe_MultinomialNB,par_MultinomialNB],
+           'GB':[pipe_GradBoost,par_GradBoost],'RF':[pipe_RandomForest,par_RandomForest]
            }
 
 
@@ -180,7 +208,7 @@ def main():
 
 
 
-    scorer='APW'
+    scorer='AP'
 
 
     # for scorer in scorers.keys():
