@@ -126,8 +126,8 @@ def create_pipelines():
         ('clf', DecisionTreeClassifier()),
     ])
     par_DecisionTree = {
-        'clf__estimator__min_samples_split': [0.1, .9],
-        'clf__class_weight':[ { 0:1, 1:1 }, { 0:1, 1:5 },{ 0:1, 1:50 }, { 0:1, 1:500 }, { 0:1, 1:5000 }, { 0:1, 1:50000 } ]
+   #     'clf__estimator__min_samples_split': [0.1, .9],
+        'clf__class_weight': [{0:w} for w in [1,5,50,500,5000,100000]  ]
     }
 
     pipe_RandomForest = Pipeline([
@@ -139,8 +139,8 @@ def create_pipelines():
         # 'vect__ngram_range': ((1, 1), (1, 2)),
         # 'vect__max_df': (0.75, 1.0),
         'clf__estimator__n_estimators': [20,50, 100],
-        'clf__class_weight': [{0: 1, 1: 1}, {0: 1, 1: 5}, {0: 1, 1: 50}, {0: 1, 1: 500}, {0: 1, 1: 5000},
-                              {0: 1, 1: 50000}]
+        'clf__class_weight':  [{0:w} for w in [1,5,50,500,5000,100000]  ]
+                              
     }
     # test
 
@@ -153,8 +153,7 @@ def create_pipelines():
         # 'vect__ngram_range': ((1, 1), (1, 2)),
         # 'vect__max_df': (0.75, 1.0),
         # 'clf__estimator__C': [1,0.8,0.5,.2],
-        'clf__class_weight': [{0: 1, 1: 1}, {0: 1, 1: 5}, {0: 1, 1: 50}, {0: 1, 1: 500}, {0: 1, 1: 5000},
-                              {0: 1, 1: 50000}]
+        'clf__class_weight':  [{0:w} for w in [1,5,50,500,5000,100000]  ]
     }
 
 
@@ -170,7 +169,7 @@ def create_pipelines():
 
 def main():
 
-    col='food'
+    col='fire'
 
     X, Y  = load_data_single(col)
     print('database loaded')
@@ -195,6 +194,7 @@ def main():
         cv_folds=3
 
         scorerAP=make_scorer(met.average_precision_score, greater_is_better=True)
+        print( model.get_params().keys()) 
 
         #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
         cv = GridSearchCV(model, scoring=scorerAP, param_grid=parameters, verbose=2, cv=cv_folds, refit='AP')
