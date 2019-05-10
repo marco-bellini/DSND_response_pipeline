@@ -193,8 +193,10 @@ def main():
         parameters = pipelines[classifier][1]
         cv_folds=3
 
+        scorerAP=make_scorer(met.average_precision_score, greater_is_better=True)
+
         #cv = GridSearchCV(model, param_grid=parameters, verbose=2, cv=cv_folds)
-        cv = GridSearchCV(model, scoring=met.average_precision_score, param_grid=parameters, verbose=2, cv=cv_folds, refit='AP')
+        cv = GridSearchCV(model, scoring=scorerAP, param_grid=parameters, verbose=2, cv=cv_folds, refit='AP')
         cv.fit(X_train, y_train)
 
         #print(cv)
