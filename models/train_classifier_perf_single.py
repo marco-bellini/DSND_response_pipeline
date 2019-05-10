@@ -142,6 +142,7 @@ def create_pipelines():
         'clf__class_weight': [{0: 1, 1: 1}, {0: 1, 1: 5}, {0: 1, 1: 50}, {0: 1, 1: 500}, {0: 1, 1: 5000},
                               {0: 1, 1: 50000}]
     }
+    # test
 
     pipe_LogisticReg = Pipeline([
         ('vect', CountVectorizer(tokenizer=tokenize)),
