@@ -55,9 +55,10 @@ def tokenize(text):
     """
 
     text = text.lower()
-    text = re.sub(r"[^a-zA-Z0-9]", " ", text)
+    text = re.sub(r"[^a-zA-Z]", " ", text)
     words = text.split()
     words = [w for w in words if w not in stopwords.words("english")]
+    words = [w for w in words if w not in ['http']]
     lemmed = [WordNetLemmatizer().lemmatize(w, pos='v') for w in words]
 
     return (lemmed)
@@ -126,8 +127,11 @@ def create_pipelines():
         ('clf', DecisionTreeClassifier()),
     ])
     par_DecisionTree = {
-   #     'clf__estimator__min_samples_split': [0.1, .9],
-        'clf__class_weight': [{0:w} for w in [1,5,50,500,5000,100000]  ]
+        'vect__min_df': (1e-6,1e-3,1e-3),
+        'vect__max_features': (100,500,2000,5000),
+        'vect__ngram_range': ((1, 1), (1, 2), (1,4)),
+        'clf__class_weight': [{0:w} for w in [1,5,50,100,500]  ]
+
     }
 
     pipe_RandomForest = Pipeline([
@@ -136,10 +140,12 @@ def create_pipelines():
         ('clf', RandomForestClassifier()),
     ])
     par_RandomForest = {
-        # 'vect__ngram_range': ((1, 1), (1, 2)),
-        # 'vect__max_df': (0.75, 1.0),
-        'clf__estimator__n_estimators': [20,50, 100],
-        'clf__class_weight':  [{0:w} for w in [1,5,50,500,5000,100000]  ]
+        'vect__min_df': (1e-6,1e-3,1e-3),
+        'vect__max_features': (100,500,2000,5000),
+        'vect__ngram_range': ((1, 1), (1, 2), (1,4)),
+
+        'clf__n_estimators': [20,50, 100],
+        'clf__class_weight':  [{0:w} for w in [1,5,50,100,500]  ]
                               
     }
     # test
@@ -150,10 +156,11 @@ def create_pipelines():
         ('clf', LogisticRegression()),
     ])
     par_LogisticReg = {
-        # 'vect__ngram_range': ((1, 1), (1, 2)),
-        # 'vect__max_df': (0.75, 1.0),
-        # 'clf__estimator__C': [1,0.8,0.5,.2],
-        'clf__class_weight':  [{0:w} for w in [1,5,50,500,5000,100000]  ]
+        'vect__min_df': (1e-6,1e-3,1e-3),
+        'vect__max_features': (100,500,2000,5000),
+        'vect__ngram_range': ((1, 1), (1, 2), (1,4)),
+
+        'clf__class_weight':  [{0:w} for w in [1,5,50,100,500]  ]
     }
 
 
@@ -180,7 +187,7 @@ def main():
 
 
 
-    scorer='APW'
+    scorer='APW2'
 
 
     # for scorer in scorers.keys():
