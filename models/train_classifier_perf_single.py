@@ -160,14 +160,17 @@ def create_pipelines():
         'vect__max_features': (100,500,2000,5000),
         'vect__ngram_range': ((1, 1), (1, 2), (1,4)),
 
+        'clf__penalty':  ['l1'  ],
+        'clf__C':  [ 1.0, 1e-2, 1e-4, 1e-8 ],
         'clf__class_weight':  [{0:w} for w in [1,5,50,100,500]  ]
     }
 
 
 
-    pipelines={ 'DT':[pipe_DecisionTree,par_DecisionTree],
+    pipelines={ 
+        #'DT':[pipe_DecisionTree,par_DecisionTree],
            'LR':[pipe_LogisticReg,par_LogisticReg],
-           'RF':[pipe_RandomForest,par_RandomForest]
+        #'RF':[pipe_RandomForest,par_RandomForest]
            }
 
 
@@ -187,7 +190,7 @@ def main():
 
 
 
-    scorer='APW2'
+    scorer='APW3'
 
 
     # for scorer in scorers.keys():
