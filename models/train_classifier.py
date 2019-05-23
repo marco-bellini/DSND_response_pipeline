@@ -1,5 +1,4 @@
 import sys
-import sys
 import pandas as pd
 import numpy as np
 
@@ -13,18 +12,19 @@ nltk.download('stopwords')
 nltk.download('wordnet')
 from nltk.stem import PorterStemmer
 
-rom sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
 from sklearn.metrics import fbeta_score, make_scorer
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.multioutput import MultiOutputClassifier
+from sklearn.linear_model import LogisticRegression
 
 from sklearn.model_selection import train_test_split
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier,AdaBoostClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.naive_bayes import BernoulliNB, MultinomialNB
+from sklearn.multiclass import OneVsRestClassifier
 
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.model_selection import GridSearchCV
@@ -33,25 +33,34 @@ from sklearn.metrics import make_scorer, accuracy_score, f1_score, fbeta_score, 
 import sklearn.metrics as met
 from sklearn.utils.fixes import signature
 import pickle
+import glob
+
+
+from sqlalchemy import create_engine
+
 
 def load_data(database_filepath):
-    """
-    loads the data from the SQL database
-    :param database_filepath: SQL database path
-    :return: X,Y,category_names
-    """
-
-    # database_filepath='sqlite:///data//InsertDatabaseName.db'
-    engine = create_engine(database_filepath)
-    df = pd.read_sql_table('InsertTableName', engine)
+    '''
+    loads the database in database_filepath and returns the features X, labels Y, and the name of the categories 
+    '''
+    
+    engine = create_engine('sqlite:///'+database_filepath)
+    df =  pd.read_sql_table('InsertTableName',engine)
     X = df['message']
-    Y = df.iloc[:, 4:]
-    category_names=list(df.columns)
-
-    return(X,Y,category_names)
-
+    Y = df.iloc[:,4:] 
+    
+    # the child_alone category shows only occurrence of the label 0, hence the label 1 cannot be predicted. 
+    # to prevent issues with  LogisticRegression this label is dropped
+    Y=Y.drop(columns=['child_alone'])
+    category_names = Y.columns
+    return ( X, Y, category_names)
+    
 
 def stem(word):
+    '''
+    stems the word, with few exceptions
+    '''
+    
     ps = PorterStemmer()
     stemmer_exceptions = ['sos']
     if word not in stemmer_exceptions:
@@ -97,45 +106,35 @@ def tokenize(text):
 
     return (lemmed)
 
-def nlp_pipeline(X_train,X_test,min_df=2, max_df=1.0, max_features=10000, ngram_range=(1, 4)):
+   
+
+def create_nlp_pipeline(X_train,min_df=2, max_df=1.0, max_features=10000, ngram_range=(1, 4)):
     # splitting the nlp from the logistic regression pipeline results in a significant speedup
 
     vect = CountVectorizer(tokenizer=tokenize, min_df=min_df, max_df=max_df, max_features=max_features,
                            ngram_range=ngram_range)
     vect.fit(X_train)
     X_train1 = vect.transform(X_train)
-    X_test1 = vect.transform(X_test)
 
     tfidf = TfidfTransformer()
     tfidf.fit(X_train1)
     X_train2 = tfidf.transform(X_train1)
-    X_test2 = tfidf.transform(X_test1)
 
-    return(X_train2,X_test2, vect, tfidf )
+    return(X_train2, vect, tfidf )
 
-def build_full_model():
+def build_best_model(vect, tfidf,cv):
+    '''
+    fits a logistic regression model and returns the best model
 
+    :return:
+    '''
     model = Pipeline([
-        ('vect', CountVectorizer(tokenizer=tokenize)),
-        ('tfidf', TfidfTransformer()),
-        ('clf', MultiOutputClassifier(
-            LogisticRegression(random_state=0, solver='liblinear', penalty='l1', max_iter=200, )
-        )),
-    ])
-    parameters= {
-        'vect__ngram_range': ((1, 1), (1, 4)),
-        'vect__max_df': (0.9, 1.0),
-        'vect__min_df': (2,3),
-        'vect__max_features': (2000, 5000,10000, 20000, None),
+            ('vect',vect),
+            ('tfidf',tfidf),
+            ('clf', cv.best_estimator_),
+        ])
+    return(model)
 
-        'clf__estimator__C': [1,   0.5,0.3, 0.25 ,.2,0.15, 0.1 ],
-        'clf__estimator__class_weight': [{1:w} for w in [1,5,10,20,30,50]  ]
-    }
-    cv_folds = 5
-
-    scorerAP = make_scorer(met.average_precision_score, greater_is_better=True)
-    cv = GridSearchCV(model, scoring=scorerAP, param_grid=parameters, verbose=1, cv=cv_folds, refit='AP')
-    return(cv.best_estimator_)
 
 def build_model():
     '''
@@ -144,28 +143,31 @@ def build_model():
     :return:
     '''
     model = Pipeline([
-            ('clf', LogisticRegression(random_state=0, solver='liblinear',penalty='l1',max_iter=200, )),
+            ('clf', OneVsRestClassifier( LogisticRegression(random_state=0, solver='liblinear',penalty='l1',max_iter=200,
+                                      ) )  ),
         ])
     parameters = {
-        'clf__C': [1,   0.5,0.3, 0.25 ,.2,0.15, 0.1 ],
-        'clf__class_weight': [{1:w} for w in [1,5,10,20,30,50]  ]
+        'clf__estimator__C': [1,   0.5,0.3, 0.25 ,.2,0.15, 0.1 ],
+        'clf__estimator__class_weight': [{1:w} for w in [1,5,10,20,30,50]  ]
     }
+    
 
-    cv_folds = 5
+    cv_folds = 3
 
     scorerAP = make_scorer(met.average_precision_score, greater_is_better=True)
     cv = GridSearchCV(model, scoring=scorerAP, param_grid=parameters, verbose=1, cv=cv_folds, refit='AP')
-    return(cv.best_estimator_)
+    return(cv)
+
 
 def evaluate_model(model, X_test, Y_test, category_names):
-
-
-
-    pass
+    y_pred=model.predict(X_test)
+    print(classification_report(Y_test.values, y_pred, target_names=category_names))
+    return
 
 
 def save_model(model, model_filepath):
-    pass
+    pickle.dump(model, open(model_filepath, 'wb'))
+    return
 
 
 def main():
@@ -174,14 +176,17 @@ def main():
         print('Loading data...\n    DATABASE: {}'.format(database_filepath))
         X, Y, category_names = load_data(database_filepath)
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
-
-        X_train, X_test, vect, tfidf = nlp_pipeline(X_train, X_test,max_features=2000)
-
+        
+        print('Vectorizing messages...')
+        X_train_tfidf, vect, tfidf=create_nlp_pipeline(X_train,min_df=2, max_df=1.0, max_features=10000, ngram_range=(1, 4))
+        
         print('Building model...')
         model = build_model()
         
         print('Training model...')
-        model.fit(X_train, Y_train)
+        model.fit(X_train_tfidf, Y_train)
+        
+        model=build_best_model(vect, tfidf,model)
         
         print('Evaluating model...')
         evaluate_model(model, X_test, Y_test, category_names)
@@ -195,7 +200,7 @@ def main():
         print('Please provide the filepath of the disaster messages database '\
               'as the first argument and the filepath of the pickle file to '\
               'save the model to as the second argument. \n\nExample: python '\
-              'train_classifier_perf_single.py ../data/DisasterResponse.db classifier.pkl')
+              'train_classifier.py ../data/DisasterResponse.db classifier.pkl')
 
 
 if __name__ == '__main__':
