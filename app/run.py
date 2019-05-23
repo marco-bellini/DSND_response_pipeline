@@ -1,6 +1,7 @@
 import json
 import plotly
 import pandas as pd
+import numpy as np
 
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
@@ -10,28 +11,30 @@ from flask import render_template, request, jsonify
 from plotly.graph_objs import Bar
 from sklearn.externals import joblib
 from sqlalchemy import create_engine
+import pickle
 
 import sys
 sys.path.insert(0, '../models')
 
-from train_classifier import *
+from train_classifier import tokenize
 
 app = Flask(__name__)
 
-def tokenize(text):
-    tokens = word_tokenize(text)
-    lemmatizer = WordNetLemmatizer()
-
-    clean_tokens = []
-    for tok in tokens:
-        clean_tok = lemmatizer.lemmatize(tok).lower().strip()
-        clean_tokens.append(clean_tok)
-
-    return clean_tokens
+# def tokenize(text):
+#     tokens = word_tokenize(text)
+#     lemmatizer = WordNetLemmatizer()
+#
+#     clean_tokens = []
+#     for tok in tokens:
+#         clean_tok = lemmatizer.lemmatize(tok).lower().strip()
+#         clean_tokens.append(clean_tok)
+#
+#     return clean_tokens
 
 # load data
 engine = create_engine('sqlite:///../data/DisasterResponse.db')
 df = pd.read_sql_table('InsertTableName', engine)
+df=df.drop(columns=['child_alone'])
 
 # load model
 #model = joblib.load("../models/classifier.pkl")
@@ -45,30 +48,61 @@ def index():
     
     # extract data needed for visuals
     # TODO: Below is an example - modify to extract data for your own visuals
-    genre_counts = df.groupby('genre').count()['message']
-    genre_names = list(genre_counts.index)
-    
+    #genre_counts = df.groupby('genre').count()['message']
+    #genre_names = list(genre_counts.index)
+
+    Y_pos = df.iloc[:, 4:].apply(np.sum, axis=0)
+    Y_counts = df.iloc[:, 4:].count()
+
+    cf = pd.concat((Y_pos, Y_counts), axis=1)
+    cf.columns = ['positive', 'counts']
+    occurrences=(cf['positive']/cf['counts']).sort_values()
+
+    occurrences_names=list(occurrences.index)
+    occurrences_counts = occurrences*100
+
     # create visuals
     # TODO: Below is an example - modify to create your own visuals
     graphs = [
         {
             'data': [
                 Bar(
-                    x=genre_names,
-                    y=genre_counts
+                    x=occurrences_names,
+                    y=occurrences_counts
                 )
             ],
 
             'layout': {
-                'title': 'Distribution of Message Genres',
+                'title': 'Disaster Occurrence per 100 messages',
                 'yaxis': {
-                    'title': "Count"
+                    'title': "Disaster type"
                 },
                 'xaxis': {
-                    'title': "Genre"
+                    'title': "Occurrence"
                 }
             }
-        }
+        },
+
+        # Second graph
+        {
+            'data': [
+                Bar(
+                    x=occurrences_names[0:10],
+                    y=occurrences_counts[0:10]
+                )
+            ],
+
+            'layout': {
+                'title': '10 Least Frequent Disaster Occurrence per 100 messages',
+                'yaxis': {
+                    'title': "Disaster type"
+                },
+                'xaxis': {
+                    'title': "Occurrence"
+                }
+            }
+        },
+
     ]
     
     # encode plotly graphs in JSON
