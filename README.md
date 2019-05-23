@@ -9,7 +9,7 @@ It demonstates a NLP pipeline based on the Figure Eight dataset. The challenge i
 - SQLalchemy
 - Flask, Plotly
 
-###  Files in the repository.
+###  Files in the repository
 - data (process_data.py: cleans data and stores in database)  
 - models (train_classifier.py:  trains classifier and saves the model)
 - app (run.py: runs the web dashboard)
