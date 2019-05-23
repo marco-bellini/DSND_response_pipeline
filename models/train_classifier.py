@@ -109,7 +109,12 @@ def tokenize(text):
    
 
 def create_nlp_pipeline(X_train,min_df=2, max_df=1.0, max_features=10000, ngram_range=(1, 4)):
-    # splitting the nlp from the logistic regression pipeline results in a significant speedup
+    '''
+    the NLP pipeline is run independently of the ML classifier.
+    After a few iterations it is easy to find the best parameters for the bag of words model, looking at the words selected.
+    splitting the nlp from the logistic regression pipeline results in a significant speedup
+    '''
+
 
     vect = CountVectorizer(tokenizer=tokenize, min_df=min_df, max_df=max_df, max_features=max_features,
                            ngram_range=ngram_range)
@@ -160,12 +165,21 @@ def build_model():
 
 
 def evaluate_model(model, X_test, Y_test, category_names):
+    '''
+    evaluates the model on the test set returning precision and accuracy scores
+
+    '''
+
     y_pred=model.predict(X_test)
     print(classification_report(Y_test.values, y_pred, target_names=category_names))
     return
 
 
 def save_model(model, model_filepath):
+    '''
+    saves the model to a file in model_filepath
+    '''
+
     pickle.dump(model, open(model_filepath, 'wb'))
     return
 

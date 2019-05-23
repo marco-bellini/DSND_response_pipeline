@@ -20,6 +20,7 @@ from train_classifier import tokenize
 
 app = Flask(__name__)
 
+# not needed: the tokenizer from the train_classifier is used.
 # def tokenize(text):
 #     tokens = word_tokenize(text)
 #     lemmatizer = WordNetLemmatizer()
